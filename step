@@ -1,36 +1,113 @@
-Step 1 (upgrade): Replace the freeform formula with a signal spec contract
-The hand-off artifact between ideation and implementation should be a fixed-schema spec file (YAML/MD), not prose. Minimum fields:
+Assume you are a senior quant researcher at a global multi-region equity quant fund.
 
-Inputs: exact tables/fields (must match data-card names)
-Universe & frequency: which univ file, daily/intraday, region
-PIT rule: which timestamp gates availability; explicit as-of lag (e.g., "usable at T+1 open, KRX flow published T 18:00 KST")
-Formula: in pseudocode/math with every parameter pinned (lookback windows, winsorization, z-score cross-sectional vs. time-series, NA handling, min-coverage threshold)
-Neutralization: none / market / industry / your existing risk factors
-Hypothesis & expected sign, horizon, decay — written before running (this is your pre-registration; it's what protects the eval from becoming p-hacking)
-Free parameters allowed to tune vs. frozen — declare in advance, cap the count
+Many signal ideas built systematically across global regions. Many existing signals already captures broad global alpha categories from technical data, fundamentals, analyst data, news, flows, options, short interest, corporate actions, and other scalable alternative datasets.
 
-Opus's stage-1 role becomes a structured feasibility review of this spec against the data cards: field exists? PIT achievable? survivorship issues? corporate-action adjustment needed? suggested amendments returned as a spec diff, which you can round-trip to GPT/Fable verbatim. Once both sides sign off, the spec is frozen and versioned — Opus then implements only what's in the spec (your requirement #2), and any deviation it thinks necessary comes back as a proposed spec amendment, never a silent code decision.
-Step 2 (upgrade): Smoke test → validation battery
-One day locally is too weak. Replace with:
+Now I want to explore **region-specific idiosyncratic alpha** that may not be captured by this systematic approach.
 
-Golden examples: 3–5 stock-days hand-computed (or computed by Opus in a separate session from raw data) and asserted in unit tests.
-Stratified sample days: a normal day, a crisis day, an index-rebalance/expiry day, a holiday-adjacent day, and a day near a known data-regime change (e.g., China northbound disclosure ending Aug 2024).
-Automated lookahead tests: shift all input timestamps forward one day — signal values for day T must not change if PIT logic is correct; also assert no signal exists before each dataset's history start, and coverage counts look sane per day.
-Distribution sanity: cross-sectional coverage, NA rate, autocorrelation/turnover of the term — compared against the spec's expectations.
+Regions to cover:
 
-Make this battery a fixed harness so Opus runs it identically for every idea.
-Step 3 (upgrade): Full run into a standardized eval + registry
-Every term, no exceptions, goes through the same evaluation report:
+South Korea, Taiwan, Hong Kong, Australia, Canada, Brazil, Malaysia, Mexico, Singapore, South Africa, India, major European countries, China A-shares, and Japan.
 
-Rank-IC by horizon (1d/5d/10d/21d) with Newey-West t-stats, IC decay curve, long-short quantile returns, turnover and capacity proxy (ADV-weighted)
-Residual IC after neutralizing your existing alpha stack — this is the number that matters for you, since the whole mandate is "not detected by current systematic approach." Raw IC is nearly irrelevant; report correlation to your existing composite and marginal contribution.
-Subperiod stability (at minimum pre/post split, plus around known regime breaks per region)
-Event-time CAR plots for event-type signals (most of your backlog — 减持, TOBs, Shariah revisions — are event studies, not daily cross-sectional factors; your harness needs both modes)
+The goal is to find alpha ideas that are **uniquely strong or unusually available in each region** because of local market structure, disclosure rules, investor composition, trading mechanics, regulatory reporting, exchange data, corporate governance, settlement rules, index mechanics, cross-listing structure, or local alternative data sources.
 
-Then a registry: one row per spec version — hypothesis, frozen spec hash, eval results, number of variants tried. Enforce a variant budget per idea (say ≤5 spec amendments) and apply a deflated-Sharpe or FDR haircut across the batch. With 67 ideas × variants, ~5% of garbage will look great by chance; the registry is your only defense.
-Step 4 (new): Close the loop back to ideation
-Have Opus write a one-page results memo per idea in a fixed template (what worked, where it failed, data surprises, decay profile). Feed these memos back into the GPT/Fable context for the next ideation round on that region. Right now your loop is open — the ideation model never learns that, e.g., Taiwan branch flow works in mid-caps but dies in the top-50; that's exactly the context that makes round-2 ideas better.
-Two orchestration-level suggestions
-Sequence by shared infrastructure, not by idea. Many ideas share a data build (KR-1/KR-2 share KRX tape work; CN-1/CN-3 share cninfo filings; EU-1 is one scraper serving 20 registries). Build the dataset once with its data card and PIT tests, then implement the 2–5 signals that sit on it. Your backlog of 67 ideas is really ~25 data-source builds.
-Keep ideation and implementation sessions separate even within Opus. The Opus session doing feasibility review should not be the one writing code from the frozen spec — a fresh session receiving only the spec + data cards + harness docs can't inherit unstated assumptions from the negotiation phase, which is a common source of "the code does what we discussed, not what the spec says."
-So the revised cycle: data cards → data-aware ideation → spec contract → Opus feasibility diff → freeze → implement + validation battery → standardized eval vs. existing stack → registry entry → results memo → next ideation round. Your role shifts from message bus to spec approver and registry gatekeeper — which is where operator judgment actually adds value.Recommended apps and extensionsBrowse allClaude Code for desktopIdeal for the implement-test-eval loop: Opus works directly in your repo, runs the validation battery, and iterates.One more practical note: put the spec template, data-card format, validation battery, and eval-harness invocation instructions into a project-level instructions file (e.g., CLAUDE.md) in your repo, so every fresh Opus implementation session starts with the full contract without you re-explaining it — that's what makes the "fresh session per frozen spec" pattern cheap to run. Happy to draft the spec-contract template and the data-card schema as concrete files if you want a starting point.Fable 5 is the most capable model and draws down usage much faster than Opus 4.8carastadsdam
+Examples of the type of ideas I care about:
+
+1. Taiwan companies release monthly revenue, which gives richer and faster information than regions where companies report quarterly or semi-annually.
+2. Some regions may have day-trader, retail flow, margin, or intraday trading mechanics that create short-horizon alpha.
+3. Korea provides investor-type flow information, including foreigner, institution, and retail activity.
+4. ADR/local-share relationships may contain information, but require careful adjustment for beta, FX, liquidity, region risk, and issuer-specific exposure.
+5. China A-shares have 龙虎榜, shareholder reduction disclosures, national team activity, northbound/southbound flows, share pledge data, and other local disclosure features.
+
+For each region, propose the top 3–5 region-specific alpha ideas.
+
+For each idea, include:
+
+1. **Idea name**
+2. **Local uniqueness**
+
+   * Why is this alpha more available, stronger, or more unique in this region than in the US or other global markets?
+   * What local rule, dataset, market microstructure, investor behavior, or institutional feature creates the opportunity?
+3. **Economic intuition**
+
+   * What is the behavioral, structural, or economic mechanism?
+   * Why should it predict future idiosyncratic returns after controlling for beta, sector, size, liquidity, momentum, value, quality, earnings revisions, and global risk factors?
+4. **Required data**
+
+   * What exact raw data is needed?
+   * Is the data public, exchange-provided, vendor-provided, regulatory, scraped, broker-provided, or difficult to source?
+   * What identifiers, timestamps, reporting lags, restatements, survivorship issues, and point-in-time concerns matter?
+5. **Concrete signal construction**
+
+   * Give a specific feature formula or design.
+   * Explain how to normalize it cross-sectionally and over time.
+   * Explain whether it should be residualized by industry, market cap, liquidity, beta, country, sector, or existing global factors.
+   * Mention useful nonlinear transformations, event-window features, decay functions, interaction terms, or regime filters.
+6. **Expected horizon**
+
+   * Intraday, 1–5 days, 1–4 weeks, 1–3 months, or longer.
+7. **Expected Sharpe potential**
+
+   * High / Medium / Low, with explanation.
+8. **Implementation difficulty**
+
+   * Easy / Medium / Hard, with explanation.
+9. **Capacity**
+
+   * High / Medium / Low, with explanation.
+10. **Crowding risk**
+
+    * High / Medium / Low, with explanation.
+11. **Key risks and false-alpha pitfalls**
+
+    * Lookahead bias
+    * Non-point-in-time data
+    * Survivorship bias
+    * Liquidity and transaction cost issues
+    * Data snooping
+    * Proxying for existing global factors
+    * Vendor timestamp problems
+12. **Why global models may miss it**
+
+    * Explain why a generic global model would not naturally capture this signal.
+    * Explain whether the signal is likely additive to existing technical, fundamental, analyst, news, flow, and quality signals.
+
+After covering all regions, provide:
+
+1. A ranked global table of the top 20 ideas by expected alpha value.
+2. A second table ranking ideas by implementation feasibility.
+3. A final shortlist of the best 5 ideas to research first, balancing alpha potential, regional uniqueness, feasibility, capacity, and production-readiness.
+4. For the top 5 ideas, provide a detailed research plan, including:
+
+   * Data sourcing plan
+   * Database schema
+   * Feature engineering design
+   * Point-in-time handling
+   * Backtest universe
+   * Rebalance frequency
+   * Delay assumption
+   * Transaction cost model
+   * Neutralization method
+   * Validation split
+   * Diagnostics for incremental value over existing global models
+   * Expected failure modes
+   * Kill criteria
+   * Evidence that would justify scaling the idea
+
+After proposing the ideas, switch roles and act as a skeptical PM reviewing them.
+
+For each top idea, critique:
+
+1. Why it may fail.
+2. Whether it is likely already crowded.
+3. Whether the data is truly point-in-time.
+4. Whether the signal is just a proxy for existing momentum, liquidity, beta, size, value, quality, or earnings revision factors.
+5. What evidence would convince you to kill the idea quickly.
+6. What evidence would make you allocate more research resources to it.
+
+Important constraints:
+
+Do not give generic factor ideas like value, momentum, quality, earnings revisions, generic sentiment, or generic flow unless they are modified by a truly region-specific dataset, disclosure rule, investor behavior, or market structure.
+
+Be creative, but stay practical. I care about ideas that a real quant fund could actually source, database, test, and deploy.
+
+Prioritize ideas with high prediction power, high Sharpe potential, region-specific uniqueness, and realistic implementation path.
